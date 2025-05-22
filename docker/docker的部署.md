@@ -40,6 +40,7 @@ chmod +x clash
 ```bash
 curl -o config.yaml "https://example.com/subscription.yaml"
 ```
+
 ##### 查看配置文件
 ```bash
 ~/.config/clash/config.yaml
@@ -88,6 +89,7 @@ sudo systemctl status clash
 #查看日志：
 journalctl -u clash -f
 ```
+sudo setenforce 0
 
 ##### 修改节点
 ```bash
@@ -112,7 +114,41 @@ source ~/.bashrc
 
 sudo systemctl restart clash
 
-### 三、重启 Docker 服务以应用代理配置
+### 三、Docker 使用代理的几种方式
+
+为了加快镜像下载速度或让容器访问被墙网站，可以通过以下方式配置代理：
+
+#### 方式一：让容器内联网使用代理
+
+运行容器时添加环境变量：
+
+```bash
+docker run -it --rm \
+  -e HTTP_PROXY=http://127.0.0.1:7890 \
+  -e HTTPS_PROXY=http://127.0.0.1:7890 \
+  ubuntu bash
+```
+
+如在 Linux 中使用宿主机 IP（例如 192.168.1.100）代替 `127.0.0.1`。
+
+#### 方式二：让 Docker daemon 本身使用代理
+
+编辑 systemd 的 Docker 服务配置：
+
+```bash
+sudo mkdir -p /etc/systemd/system/docker.service.d
+sudo nano /etc/systemd/system/docker.service.d/http-proxy.conf
+```
+
+写入以下内容（按需修改代理地址）：
+
+```ini
+[Service]
+Environment="HTTP_PROXY=http://127.0.0.1:7890"
+Environment="HTTPS_PROXY=http://127.0.0.1:7890"
+```
+
+保存后重启 Docker：
 
 ```bash
 sudo systemctl daemon-reexec
@@ -120,7 +156,54 @@ sudo systemctl daemon-reload
 sudo systemctl restart docker
 ```
 
-### 四、验证是否可用
+验证代理配置：
+
+```bash
+docker info | grep -i proxy
+```
+
+#### 方式三：配置默认代理使所有容器都继承
+
+创建或修改配置文件：
+
+```bash
+mkdir -p ~/.docker
+nano ~/.docker/config.json
+```
+
+写入：
+
+```json
+{
+  "proxies": {
+    "default": {
+      "httpProxy": "http://127.0.0.1:7890",
+      "httpsProxy": "http://127.0.0.1:7890",
+      "noProxy": "localhost,127.0.0.1"
+    }
+  }
+}
+```
+
+然后重启 Docker：
+
+```bash
+sudo systemctl restart docker
+```
+
+---
+
+以上方式可以单独使用，也可以组合使用以确保容器及 Docker 引擎都能访问外网。
+
+### 四、重启 Docker 服务以应用代理配置
+
+```bash
+sudo systemctl daemon-reexec
+sudo systemctl daemon-reload
+sudo systemctl restart docker
+```
+
+### 五、验证是否可用
 
 ```bash
 docker pull hello-world
