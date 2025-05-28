@@ -73,11 +73,8 @@ services:
   redis:
     image: redis:alpine
 ```
-
----
-
-## 实战建议
-
-- 使用多阶段构建优化镜像大小
-- 将构建参数 `ARG` 和运行参数 `ENV` 区分管理
-- 通过 `.env` 文件和 Compose 配置配合实现环境隔离
+一般命令
+```bash
+docker compose up -d
+docker compose down
+```
