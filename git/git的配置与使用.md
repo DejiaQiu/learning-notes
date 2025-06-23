@@ -1,14 +1,17 @@
 ## 📌 Git 的配置与使用指南
 
-### 🧱 一、如何生成 SSH Key
+### 🧱 一、生成 SSH Key
+
 
 ```bash
-ssh-keygen -t rsa -C "你的邮箱" -f ~/.ssh/id_rsa_gitee
+ssh-keygen -t rsa -C "你的邮箱" -f ~/.ssh/id_rsa
 ```
+
 
 说明：
 - `-C`：注释（推荐写你的邮箱）
 - `-f`：指定生成的 key 文件路径
+
 
 常见使用：
 ```bash
@@ -21,6 +24,11 @@ ssh-keygen -t rsa -C "798951257@qq.com" -f ~/.ssh/id_rsa_gitee
 ```bash
 ssh-keygen -t rsa -C "you@github.com" -f ~/.ssh/id_rsa_github
 ```
+2. 为 Gitee 生成：
+```bash
+ssh-keygen -t rsa -C "you@gitee.com" -f ~/.ssh/id_rsa_gitee
+```
+
 
 2. 编辑 `~/.ssh/config` 文件：
 
