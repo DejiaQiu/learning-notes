@@ -15,7 +15,7 @@ ssh-keygen -t rsa -C "你的邮箱" -f ~/.ssh/id_rsa
 
 常见使用：
 ```bash
-ssh-keygen -t rsa -C "798951257@qq.com" -f ~/.ssh/id_rsa_gitee
+ssh-keygen -t rsa -C "798951257@qq.com" -f ~/.ssh/id_rsa_github
 ```
 
 ### 🔑 二、配置多个 SSH Key（GitHub 和 Gitee）
