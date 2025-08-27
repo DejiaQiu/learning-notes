@@ -1,17 +1,19 @@
-✅ 目标与约定
-	•	机器与主机名：master、worker01、worker02（三台都要做）
-	•	系统：Rocky 8/9 混用也可以（cgroup 说明见下）
-	•	安装方式：源码安装到 /usr/local
-	•	Slurm 运行账户：slurm:slurm
-	•	目录位置（按你要求）
-	•	状态/队列：StateSaveLocation=/home/slurm/spool/slurmctld
-	•	计算节点本地缓存：SlurmdSpoolDir=/home/slurm/spool/slurmd
-	•	日志：/home/slurm/log/...
-	•	认证：MUNGE（同一把 key）
+# ✅ 环境介绍
+机器与主机名：master、worker01、worker02
+系统：master为rocky9.5、worker01为centos9、worker02为rocky8
+安装方式：munge使用dnf源安装，slurm源码安装到 /usr/local
+munge 运行账户：munge:munge
+Slurm 运行账户：slurm:slurm
+目录位置:
+	状态/队列：StateSaveLocation=/var/spool/slurmctld
+	计算节点本地缓存：SlurmdSpoolDir=/var/spool/slurmd
+	日志文件：SlurmctldLogFile=/var/log/slurm/slurmctld.log
+			SlurmdLogFile=/var/log/slurm/slurmd-%n.log
+认证：MUNGE（同一把 key）
 
-⸻
+# 部署
 
-1. 准备：三台机统一主机名与 hosts
+#### 0. 准备：三台机统一主机名与 hosts
 
 三台机都执行，保证 `hostname -s` 分别为：
 ```bash
@@ -32,7 +34,7 @@ sudo vim /etc/hosts
 
 ⸻
 
-1. 三台机都装依赖
+#### 1. 三台机都装依赖
 ```bash
 sudo dnf install -y epel-release
 sudo dnf groupinstall -y "Development Tools"
@@ -48,37 +50,33 @@ Rocky8/9 都适用。若提示包名不同，按提示补齐。
 
 ⸻
 
-2. 创建系统用户与目录（创建munge、slurm账户，统一 UID/GID）
+#### 2. 创建系统用户与目录（创建munge、slurm账户，统一 UID/GID）
 
 强烈建议全集群统一 UID/GID，避免“Unexpected uid != Slurm uid”类错误。下面示例用 978/976；若被占用，挑一个全集群都空闲的数字。
 
 在三台机依次执行：
 
-# slurm 用户与组
+##### slurm 用户与组
 ```bash
 sudo groupadd -g 976 slurm 2>/dev/null || true
 id -u slurm &>/dev/null || sudo useradd -m -u 978 -g 976 -s /bin/bash slurm
 ```
 
-# munge 用户与组（通常包会自带，如无则创建）
+##### munge 用户与组（通常包会自带，如无则创建）
 ```bash
 sudo groupadd -r munge 2>/dev/null || true
 id -u munge &>/dev/null || sudo useradd -r -g munge -s /sbin/nologin munge
 ```
 
-# 你自定义的目录（重要）
+##### 你自定义的目录（重要）
 ```bash
-sudo mkdir -p /home/slurm/spool/slurmctld \
-              /home/slurm/spool/slurmd \
-              /home/slurm/log
-sudo chown -R slurm:slurm /home/slurm
-sudo chmod -R 755 /home/slurm
+sudo mkdir -p/var/spool/slurmctld /var/spool/slurmd /var/log/slurm
+sudo chown -R slurm:slurm  /var/spool/slurmctld /var/spool/slurmd /var/log/slurm
+sudo chmod -R 755 /var/spool/slurmctld /var/spool/slurmd /var/log/slurm
 ```
-后续 SELinux 如是 Enforcing，记得 sudo restorecon -Rv /home/slurm。
-
 ⸻
 
-3. 配置 MUNGE（同一把密钥）
+#### 3. 配置 MUNGE（同一把密钥）
 
 在 master：
 ```bash
@@ -103,17 +101,16 @@ sudo systemctl enable --now munge
 ```bash
 munge -n | unmunge | head
 ```
-# 跨机验证（在 worker01）：
+跨机验证（在 worker01）：
 ```bash
 munge -n | ssh master unmunge | head
 ```
 
-
 ⸻
 
-4. 源码编译安装 Slurm（每台机都装）
+#### 4. 源码编译安装 Slurm（每台机都装）
 ```bash
-cd ~
+cd /opt/
 wget https://download.schedmd.com/slurm/slurm-23.11.9.tar.bz2
 tar -xjf slurm-23.11.9.tar.bz2
 cd slurm-23.11.9
@@ -122,60 +119,58 @@ cd slurm-23.11.9
 make -j"$(nproc)"
 sudo make install
 ```
-之后 Slurm 可执行位于 /usr/local/sbin、/usr/local/bin。systemd unit 要用这个路径，不要写 /usr/sbin。可以用`which slurm`确定slurm安装位置。
+可以用`which slurm`确定slurm安装位置。后面配置服务可以协助验证。
+
 测试:
 ```bash
 slurmd --version
 ```
 ⸻
 
-5. 写统一的 /etc/slurm/slurm.conf（在 master 生成 → 分发）
+#### 5. 写统一的 /etc/slurm/slurm.conf（在 master 生成 → 分发）
 
 先在 master 编辑，主机配置可以用`slurmd -C`查询
 ```bash
 sudo vim /etc/slurm/slurm.conf
 ```
 ```bash
-### 基本
 ClusterName=hpc-cluster
 ControlMachine=master
-ControlAddr=192.168.124.5
-
-### 认证与运行账户
 SlurmUser=slurm
 AuthType=auth/munge
 
-### 状态、缓存、日志
-StateSaveLocation=/home/slurm/spool/slurmctld
-SlurmdSpoolDir=/home/slurm/spool/slurmd
-SlurmctldLogFile=/home/slurm/log/slurmctld.log
-SlurmdLogFile=/home/slurm/log/slurmd-%n.log
+#日志
+# Slurm 主控状态保存路径
+StateSaveLocation=/var/spool/slurmctld
 
-### 端口（默认即可）
-SlurmctldPort=6817
-SlurmdPort=6818
+# slurmd 工作 spool
+SlurmdSpoolDir=/var/spool/slurmd
 
-### 调度/选择/任务插件（Rocky8/9 通用）
-SchedulerType=sched/backfill
-SelectType=select/cons_res
-SelectTypeParameters=CR_Core_Memory
+# 日志文件（建议放 /var/log 下）
+SlurmctldLogFile=/var/log/slurm/slurmctld.log
+SlurmdLogFile=/var/log/slurm/slurmd-%n.log
+# 计算节点（含 master）
+NodeName=master CPUs=104 RealMemory=180000 State=UNKNOWN
+NodeName=worker01 CPUs=112 RealMemory=180000 State=UNKNOWN
+NodeName=worker02 CPUs=96 RealMemory=250000 State=UNKNOWN
+PartitionName=normal Nodes=master,worker01,worker02 Default=YES MaxTime=INFINITE State=UP
+
+# 避免报错
+MailProg=/bin/true
 ProctrackType=proctrack/cgroup
 TaskPlugin=task/cgroup
 
-### 其他基础
-ReturnToService=2
-SlurmctldPidFile=/run/slurmctld.pid
-SlurmdPidFile=/run/slurmd.pid
-SwitchType=switch/none
-# 邮件程序占位，防止告警
-MailProg=/bin/true
+# 完全禁用 accounting/account/slurmdbd
+AccountingStorageType=none
+AccountingStorageHost=localhost
+AccountingStoragePort=6819
 
-### 节点（请按实际 CPU / 内存修改 RealMemory 值）
-NodeName=master   NodeAddr=192.168.124.5   CPUs=104 RealMemory=180000 State=UNKNOWN
-NodeName=worker01 NodeAddr=192.168.124.19  CPUs=112 RealMemory=180000 State=UNKNOWN
-NodeName=worker02 NodeAddr=192.168.124.18  CPUs=96  RealMemory=250000 State=UNKNOWN
+# 简单优先级（可选）
+PriorityType=priority/basic
 
-PartitionName=normal Nodes=master,worker01,worker02 Default=YES MaxTime=INFINITE State=UP
+# 关闭资源收集
+JobAcctGatherType=jobacct_gather/none
+JobAcctGatherFrequency=0
 ```
 
 # 修改权限与属主
@@ -199,7 +194,7 @@ md5sum /etc/slurm/slurm.conf
 ```
 ⸻
 
-6.（可选）cgroup.conf（建议开 CPU/内存约束）
+#### 6.（可选）cgroup.conf（建议开 CPU/内存约束）
 
 三台机：
 ```bash
@@ -215,12 +210,13 @@ Rocky8 默认 cgroup v1，Rocky9 多为 v2：TaskPlugin=task/cgroup 在 23.11 �
 
 ⸻
 
-1. systemd 单元（使用 /usr/local 路径）(一般编译的都自带了)
-
+#### 7. 服务单元(一般编译的都自带了)
 ```bash
 master:
 sudo vim /etc/systemd/system/slurmctld.service
-
+```
+slurmctld
+```bash
 [Unit]
 Description=Slurm controller daemon
 After=network.target munge.service
@@ -239,7 +235,8 @@ WantedBy=multi-user.target
 三台都写:
 ```bash
 sudo vim /etc/systemd/system/slurmd.service
-
+```
+```bash
 [Unit]
 Description=Slurm node daemon
 After=network.target munge.service
@@ -263,7 +260,7 @@ sudo systemctl daemon-reload
 
 ⸻
 
-1. 防火墙与 SELinux
+#### 8. 防火墙与 SELinux
 
 三台机都放行：
 ```bash
@@ -277,7 +274,7 @@ sudo restorecon -Rv /etc/slurm /home/slurm
 
 ⸻
 
-9. 启动顺序与验证
+#### 9. 启动顺序与验证
 
 三台机：
 ```bash
@@ -285,8 +282,10 @@ sudo systemctl enable --now munge
 
 master：
 
-sudo systemctl enable --now slurmctld
+sudo systemctl enable --now slurmctld slurmd
 sudo systemctl status slurmctld --no-pager
+sudo systemctl status slurmd --no-pager
+
 
 worker01 / worker02：
 
@@ -308,7 +307,7 @@ scontrol update NodeName=worker01 State=RESUME
 
 ⸻
 
-10. 提交测试作业
+#### 10. 提交测试作业
 ```bash
 单节点：
 
@@ -343,51 +342,3 @@ squeue
 	2.	同一把 MUNGE key（权限 400，属 munge:munge）。
 	3.	同一份 slurm.conf（逐字节一致；NodeAddr/HostName/IP 写对）。
 ⸻
-
-
-常用命令（存档）:
-
-开关服务
-sudo systemctl restart slurmd  
-sudo systemctl restart slurmctld 
-sudo systemctl restart munge
-
-服务状态
-sudo systemctl status slurmd  
-sudo systemctl status slurmctld 
-sudo systemctl status munge
-
-查看日志
-tail -f /home/slurm/spool/slurmd/slurmd.log
-
-slurm.conf文件配置：
-```bash
-ClusterName=hpc-cluster
-ControlMachine=master
-
-SlurmUser=slurm
-AuthType=auth/munge
-
-#日志
-StateSaveLocation=/home/slurm/spool/slurmctld
-SlurmdSpoolDir=/home/slurm/spool/slurmd
-SlurmctldLogFile=/home/slurm/log/slurmctld.log
-SlurmdLogFile=/home/slurm/log/slurmd-%n.log
-# 计算节点（含 master）
-NodeName=master CPUs=104 RealMemory=180000 State=UNKNOWN
-NodeName=worker01 CPUs=112 RealMemory=180000 State=UNKNOWN
-NodeName=worker02 CPUs=96 RealMemory=250000 State=UNKNOWN
-PartitionName=normal Nodes=master,worker01,worker02 Default=YES MaxTime=INFINITE State=UP
-
-# 避免报错
-MailProg=/bin/true
-ProctrackType=proctrack/cgroup
-TaskPlugin=task/cgroup
-
-# 不用 slurmdbd，关掉计费
-AccountingStorageType=none
-AccountingStorageHost=localhost
-AccountingStoragePort=6819
-JobAcctGatherType=jobacct_gather/none
-JobAcctGatherFrequency=0
-```
