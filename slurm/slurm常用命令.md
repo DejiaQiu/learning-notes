@@ -13,6 +13,9 @@ sudo systemctl status munge
 查看日志
 tail -f /var/log/slurm/slurmctld.log
 
+手动启动节点
+sudo scontrol update NodeName=worker01 State=RESUME
+
 查看状态：
 sinfo
 

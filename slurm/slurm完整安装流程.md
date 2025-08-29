@@ -302,7 +302,7 @@ scontrol show node worker02
 
 若有节点 DOWN，可尝试：
 
-scontrol update NodeName=worker01 State=RESUME
+sudo scontrol update NodeName=worker01 State=RESUME
 ```
 
 ⸻
