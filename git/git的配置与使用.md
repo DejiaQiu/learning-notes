@@ -87,5 +87,19 @@ git push origin-gitee main
 | 查看状态 | `git status` |
 | 查看历史 | `git log` |
 | 删除远程 | `git remote remove origin` |
-
 ---
+合并分支流程：
+# 1) 确保工作区干净
+git status
+
+# 2) 同步远端分支信息（建议做）
+git fetch origin
+
+# 3) 切到你的目标分支（如果已经在 a 就不用切）
+git checkout a
+
+# 4) 合并 b 到 a（本地分支名是 b；若只在远端，用 origin/b）
+git merge b
+# 或者（不在本地有 b 时）
+git merge origin/b
+
