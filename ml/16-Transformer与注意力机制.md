@@ -353,7 +353,7 @@ $$
 
 - `x` 是子层输入。
 - `Sublayer(x)` 可以是 attention 或 FFN。
-- `x + Sublayer(x)` 是残差连接。
+- $x + \mathrm{Sublayer}(x)$ 是残差连接。
 - `LayerNorm` 用于稳定训练。
 
 作用：
@@ -411,7 +411,7 @@ $$
 
 所以需要 causal mask。
 
-如果 `j > i`，第 `i` 个位置不能关注第 `j` 个位置：
+如果 $j > i$，第 $i$ 个位置不能关注第 $j$ 个位置：
 
 $$
 M_{ij} =
